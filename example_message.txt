@@ -1,0 +1,13 @@
+First line used as subject line
+Subsequent lines used as body. Performs string formatting to insert *recipient*
+data from the players csv file. For example:
+
+{name} will be replaced with the name of the recipient (as found in the
+recipient's row of the players csv file). The name in the braces must match the
+name of one of the columns in the csv file.
+
+For the example_players.csv file {email} will also work and will be replaced
+with the recipient's email.
+
+The formatting will also replace any instance of double pipe "||" in the csv
+file with a line break.
