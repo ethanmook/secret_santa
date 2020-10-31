@@ -1,0 +1,29 @@
+# Lines beginning with '#' are ignored
+# Rules are each a single line of the form:
+
+column_name:giver_val (gets|nogets) other_column:recipient_val
+
+# meaning anyone with value giver_val in column_name is either guaranteed to get
+# or bared from getting someone with value recipient_val in other_column
+
+
+# Examples:
+
+# Bob will be assigned to buy for Sally
+
+name:Bob gets name:Sally
+
+# No one in group 2 will be assigned to buy for Bob
+
+group:2 nogets name:Bob
+
+
+# If you want to match on a value in a column that has spaces, it must be
+# surrounded by quotation marks. For example:
+
+name:"Bob Smith" nogets name:"Alice Jones"
+
+# Warning: At the moment, rules are enforced by simply generating a derangement
+# randomly until it satisfies all the rules. If you add many rules that are
+# restrictive, it will take significantly longer to generate (or may run
+# infinitely).

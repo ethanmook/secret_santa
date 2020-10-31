@@ -4,6 +4,7 @@ import random
 import sys
 import argparse
 import pandas
+import re
 
 import smtplib
 from email.message import EmailMessage
@@ -20,21 +21,39 @@ def gen_derangement(n):
     return der
 
 
-def gen_constrained_derangement(df, group):
-    '''Generates a derangement with the additional constraint that no one gets a
-    person in their group (someone with the same value in column
-    group). Currently just tries by brute force.'''
-    der = []
-    fail = True
-    while fail:
-        fail = False
-        der = gen_derangement(len(df))
+def satisfies_rule(df, der, col1, val1, col2, val2, gets):
+    '''The rule constructed from reading the line'''
+    for idx, row in df.loc[df[col1] == val1].iterrows():
+        recipient = df.iloc[der[idx]]
+        if (df.iloc[der[idx]][col2] == val2) != gets:
+            return False
+    return True
+
+
+def is_valid_constrained_derangement(df, der, group, rules):
+    '''Checks if a given derangement satisfies the constraints'''
+    if group is not None:
         for i, j in enumerate(der):
             player = df.iloc[i]
             recipient = df.iloc[j]
-            if player['group'] == recipient['group']:
-                fail = True
-                continue
+            if player[group] == recipient[group]:
+                return False
+
+    for rule in rules:
+        if not satisfies_rule(df, der, *rule):
+            return False
+
+    return True
+
+
+def gen_constrained_derangement(df, group, rules):
+    '''Generates a derangement with the additional constraints that no one gets a
+    person in their group (someone with the same value in column group) and the
+    rules are satisfied. Currently just tries by brute force.'''
+    der = gen_derangement(len(df))
+    while not is_valid_constrained_derangement(df, der, group, rules):
+        der = gen_derangement(len(df))
+
     return der
 
 
@@ -76,23 +95,40 @@ def send_emails(uname, pwd, server, df, subject, body):
     s.quit()
 
 
-def first_line_rest(path):
-    f = open(path)
-    first_line = f.readline().strip()
-    rest = f.read().strip()
-    f.close()
-    return first_line, rest
+def parse_first_rest(path):
+    '''Reads a file and returns the first line and rest of file as separate strings'''
+    with open(path, 'r') as f:
+        first_line = f.readline().strip()
+        rest = f.read().strip()
+        return first_line, rest
 
 
-def print_constrained_derangement(df, group, name, der):
-    '''Print the constrained derangement. For debugging purposes only'''
+def parse_rules_file(path):
+    '''Parse path as a rulesfile to build a list of tokens to be checked by check_rule'''
+    with open(path, 'r') as f:
+        rules = []
+        for line in f:
+           line = line.strip()
+           if not line or line[0] == '#':
+               continue
+           tokens = re.split(r'(?:\s|:)(?=(?:[^"]*"[^"]*")*[^"]*$)', line)
+           col1, val1, mode, col2, val2 = tokens
+           val1 = val1.replace('"', '')
+           val2 = val2.replace('"', '')
+           gets = mode == 'gets'
+
+           rules.append((col1, val1, col2, val2, gets))
+        return rules
+           
+
+def print_derangement(df, printcol, der):
+    '''Print the derangement, printing the value of printcol for each player.'''
     for index, player in df.iterrows():
         recipient = df.iloc[der[index]]
-        print('({:2d}, {:>10.10}) in group {} got ({:2d}, {:>10.10}) in group {}'.format(
-            index, player[name], player[group],
-            der[index], recipient[name], recipient[group]
+        print('({:2d}, {:>10.10}) -> ({:2d}, {:>10.10})'.format(
+            index, player[printcol], 
+            der[index], recipient[printcol],
         ))
-        assert(player[group] != recipient[group])
 
 
 def main():
@@ -103,7 +139,8 @@ def main():
                         help='Text file with message to send: subject<\\n>message')
     parser.add_argument('-c', '--credfile',
                         dest='credfile',
-                        help='File with gmail creds email pwd on separate lines. If not present no emails are sent')
+                        help='File with gmail creds email pwd on separate lines. '\
+                        'If not present no emails are sent')
     parser.add_argument('-v', '--verbose',
                         dest='verbose',
                         action='store_true',
@@ -111,29 +148,42 @@ def main():
     parser.add_argument('-s', '--server',
                         dest='server',
                         default='smtp.gmail.com',
-                        help='SMTP server domain. Default: smtp.gmail.com *not been tested with other servers*')
+                        help='SMTP server domain. Default: smtp.gmail.com '\
+                        '*not been tested with other servers*')
     parser.add_argument('-g', '--group',
                         dest='group',
-                        help='Generate the derangement with constraint that no one gets a person with the same value in column "GROUP""')
+                        help='Generate the derangement with constraint that '\
+                        'no one gets a person with the same value in column "GROUP""')
     parser.add_argument('-t', '--no-derangement',
                         dest='test',
                         action='store_true',
                         help='Test mode: skip derangement (i.e. everyone gets themselves)')
+    parser.add_argument('-r', '--rulesfile',
+                        dest='rulesfile',
+                        help='File with additional rules (see example for details)')
+    parser.add_argument('-p', '--print',
+                        dest='printcol',
+                        help='Print the resulting derangement, printing PRINTCOL'\
+                        ' as an identifier for each player')
     args = parser.parse_args()
-    subject, body = first_line_rest(args.message)
-    df = pandas.read_csv(args.players)
+    subject, body = parse_first_rest(args.message)
+    df = pandas.read_csv(args.players, dtype=object)
     der = df.index.tolist()
+
+    rules = parse_rules_file(args.rulesfile) if args.rulesfile is not None else []
     if not args.test:
-        if args.group is not None:
-            der = gen_constrained_derangement(df, args.group)
-            print_constrained_derangement(df, args.group, 'name', der)
+        if args.group is not None or args.rulesfile is not None:
+            der = gen_constrained_derangement(df, args.group, rules)
         else:
             der = gen_derangement(len(df))
+    if args.printcol is not None:
+        print_derangement(df, args.printcol, der)
+
     df['recipient'] = der
     
     uname, pwd = '', ''
     if args.credfile is not None:
-        uname, pwd = first_line_rest(args.credfile)
+        uname, pwd = parse_first_rest(args.credfile)
         send_emails(uname, pwd, args.server, df, subject, body)
 
     if args.verbose:
