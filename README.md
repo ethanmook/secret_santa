@@ -8,17 +8,23 @@ and send out emails to everyone so that they know their giftee but nothing else.
 In order to run the program with default settings and have it send emails you
 will need:
 
-- A csv file `players.csv` containing a list of players and their email addresses (and
-  potentially other information)
-- A text file `message.txt` containing the message that will form the body of the email
-- A file `creds.txt` containing the credentials for the email account that will send out the
+- An email account capable of sending outgoing mail through the python smtp
+  library. By default the program assumes you are using a gmail account. For
+  this to work in gmail, you have to [enable less secure apps](https://support.google.com/mail/thread/26987633?hl=en)
+- A file `creds.txt` containing the credentials for that email account that will send out the
   emails in the form
+
   ```
   example@email.com
   password
   ```
+  
+- A csv file `players.csv` containing a list of players and their email
+  addresses (and potentially other information)
+- A text file `message.txt` containing the message that will form the body of the email
 
-Then simply run 
+Then run 
+
 ```
 ./secret_santa.py players.csv message.txt -c creds.txt
 ```
@@ -62,5 +68,5 @@ You are currently required to store your email credentials in plain text (at
 least for the duration of your use of the program). If I care enough I'll add
 the capability to read credentials from stdin. The program only supports SMTP
 and uses gmail by default. I added the ability to change the server, but I've
-never tested it with other servers (I also don't really know much about how SMTP
-works).
+never tested it with other servers. (I also don't really know much about how SMTP
+works.)
